@@ -51,9 +51,10 @@ export function sanitizeSearchQuery(query: string | null | undefined): string {
     ]
 
     let safe = truncated
-    dangerousPatterns.forEach(pattern => {
-        safe = safe.replace(pattern, '')
-    })
+    // ✅ Исправлено: заменён forEach на for с индексом (устранение ошибки no-restricted-syntax)
+    for (let i = 0; i < dangerousPatterns.length; i += 1) {
+        safe = safe.replace(dangerousPatterns[i], '')
+    }
 
     safe = safe.replace(/[.*+?^${}()|[\]\\]/g, '')
 

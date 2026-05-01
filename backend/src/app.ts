@@ -123,7 +123,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 })
 
 // Обработчик ошибок CSRF
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     if (err.code === 'EBADCSRFTOKEN') {
         console.error('CSRF token validation failed:', err.message)
         return res.status(403).json({ success: false, message: 'Invalid CSRF token' })

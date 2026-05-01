@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { AsyncThunk } from '@reduxjs/toolkit'
 import { useDispatch, useSelector } from '@store/hooks'
 import { RootState } from '@store/store'

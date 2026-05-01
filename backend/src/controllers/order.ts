@@ -20,7 +20,9 @@ const MAX_SEARCH_LENGTH = 100
 const dangerousOperators = ['$where', '$function', '$expr', '$jsonSchema', '$regex', '$options'];
 const checkForDangerousOperators = (obj: any): boolean => {
     if (!obj || typeof obj !== 'object') return false;
-    for (const key of Object.keys(obj)) {
+    const keys = Object.keys(obj);
+    for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i];
         if (dangerousOperators.includes(key)) return true;
         if (typeof obj[key] === 'object' && checkForDangerousOperators(obj[key])) return true;
     }
@@ -270,7 +272,7 @@ export const getOrdersCurrentUser = async (
 
             // ✅ Исправлено: явное преобразование _id в строку через цикл
             const productIdStrings: string[] = []
-            for (let i = 0; i < products.length; i++) {
+            for (let i = 0; i < products.length; i += 1) {
                 const product = products[i]
                 const idStr = (product._id as Types.ObjectId).toString()
                 productIdStrings.push(idStr)
@@ -282,7 +284,7 @@ export const getOrdersCurrentUser = async (
                 
                 // Проверка по названию товара
                 let matchesProductTitle = false
-                for (let j = 0; j < order.products.length; j++) {
+                for (let j = 0; j < order.products.length; j +=1) {
                     const product = order.products[j]
                     const productIdStr = (product._id as Types.ObjectId).toString()
                     if (productIdStrings.includes(productIdStr)) {
@@ -486,16 +488,17 @@ export const createOrder = async (
 
         const validItems: Types.ObjectId[] = []
 
-        for (const id of items) {
-            const validId = validateObjectId(id)
-            if (!validId) {
-                throw new BadRequestError(`Невалидный ID товара: ${id}`)
-            }
+        for (let idx = 0; idx < items.length; idx += 1) {
+        const id = items[idx];
+        const validId = validateObjectId(id)
+        if (!validId) {
+        throw new BadRequestError(`Невалидный ID товара: ${id}`)
+    }
             
             let foundProduct: IProduct | null = null
             const validIdStr = validId.toString()
             
-            for (let i = 0; i < products.length; i++) {
+            for (let i = 0; i < products.length; i += 1) {
                 const product = products[i]
                 const productIdStr = (product._id as Types.ObjectId).toString()
                 if (productIdStr === validIdStr) {

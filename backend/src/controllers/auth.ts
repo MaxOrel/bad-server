@@ -60,7 +60,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
             success: true,
             user,
             accessToken,
-            csrfToken: csrfToken,
+            csrfToken,
         })
     } catch (err) {
         return next(err)
@@ -110,7 +110,7 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
             success: true,
             user: newUser,
             accessToken,
-            csrfToken: csrfToken,
+            csrfToken,
         })
     } catch (error) {
         if (error instanceof MongooseError.ValidationError) {
