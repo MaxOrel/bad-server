@@ -15,11 +15,15 @@ const MAX_FILES_COUNT = 1;
 
 // Безопасное имя файла (без оригинального имени)
 function safeFilename(originalName: string): string {
-    // Берём только расширение из оригинального имени
-    const extension = originalName.substring(originalName.lastIndexOf('.'));
+    // Извлекаем только расширение (если есть)
+    const lastDotIndex = originalName.lastIndexOf('.');
+    const extension = lastDotIndex > 0 ? originalName.substring(lastDotIndex) : '';
+    
+    // Генерируем полностью случайное имя
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    // Формируем полностью новое имя, не содержащее оригинальное
+    const random = Math.random().toString(36).substring(2, 15);
+    
+    // Возвращаем имя, которое НЕ содержит оригинальное имя файла
     return `${timestamp}_${random}${extension}`;
 }
 

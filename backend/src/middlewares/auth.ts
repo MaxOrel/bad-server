@@ -41,14 +41,16 @@ const auth = async (req: Request, res: Response, next: NextFunction) => {
 
 export function roleGuardMiddleware(...roles: Role[]) {
     return (_req: Request, res: Response, next: NextFunction) => {
+        // Проверяем, есть ли пользователь в res.locals.user
         if (!res.locals.user) {
             return next(new UnauthorizedError('Необходима авторизация'))
         }
 
-        // ✅ Проверяем, что у пользователя есть хотя бы одна из требуемых ролей
-        const hasAccess = res.locals.user.roles?.some((role: Role) => 
-            roles.includes(role)
-        ) ?? false
+        // Получаем роли пользователя (убеждаемся, что это массив)
+        const userRoles = res.locals.user.roles || []
+        
+        // Проверяем, есть ли у пользователя хотя бы одна из требуемых ролей
+        const hasAccess = roles.some(role => userRoles.includes(role))
 
         if (!hasAccess) {
             return next(new ForbiddenError('Доступ запрещен'))

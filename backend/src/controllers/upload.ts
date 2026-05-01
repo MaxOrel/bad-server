@@ -3,6 +3,7 @@ import { constants } from 'http2'
 import fs from 'fs'
 import BadRequestError from '../errors/bad-request-error'
 
+const MIN_FILE_SIZE = 2 * 1024;
 const MAX_FILE_SIZE = 1 * 1024 * 1024
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
 
@@ -22,7 +23,12 @@ export const uploadFile = async (
             }
             return next(new BadRequestError('Неподдерживаемый тип файла. Разрешены: PNG, JPEG, GIF, WebP'))
         }
-
+        if (req.file.size < MIN_FILE_SIZE) {
+            if (fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+        }
+    return next(new BadRequestError(`Файл слишком маленький. Минимальный размер ${MIN_FILE_SIZE / 1024}KB`));
+}
         if (req.file.size > MAX_FILE_SIZE) {
             if (fs.existsSync(req.file.path)) {
                 fs.unlinkSync(req.file.path)

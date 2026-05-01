@@ -24,8 +24,9 @@ const limiter = rateLimit({
     message: 'Слишком много запросов, попробуйте позже',
     standardHeaders: true,
     legacyHeaders: false,
+    skipSuccessfulRequests: false,
 })
-app.use('/api/', limiter)
+app.use(limiter)
 
 // Ограничение размера тела запроса
 app.use(json({ limit: '1mb' }))
