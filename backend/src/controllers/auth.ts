@@ -11,7 +11,6 @@ import UnauthorizedError from '../errors/unauthorized-error'
 import User from '../models/user'
 import { sanitizeHtml } from '../utils/sanitize'
 
-// ✅ Вспомогательная функция для безопасной валидации email (ReDoS защита)
 const safeEmailValidate = (email: string): boolean => {
     if (!email) return false;
     if (email.length > 254) return false;
@@ -27,12 +26,10 @@ const safeEmailValidate = (email: string): boolean => {
     return true;
 };
 
-// POST /auth/login
 const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
         let { email, password } = req.body
         
-        // ✅ ReDoS защита: ограничение длины email и пароля
         if (email && typeof email === 'string') {
             email = email.slice(0, 100);
         }
@@ -40,7 +37,6 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
             password = password.slice(0, 100);
         }
         
-        // ✅ Валидация email
         if (!safeEmailValidate(email)) {
             return next(new BadRequestError('Невалидный формат email'));
         }
@@ -57,23 +53,24 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
             REFRESH_TOKEN.cookie.options
         )
         
+        // ✅ Возвращаем csrfToken для тестов
+        const csrfToken = (req as any).csrfToken ? (req as any).csrfToken() : null;
+        
         return res.json({
             success: true,
             user,
             accessToken,
-            csrfToken: req.csrfToken?.() || null,
+            csrfToken: csrfToken,
         })
     } catch (err) {
         return next(err)
     }
 }
 
-// POST /auth/register
 const register = async (req: Request, res: Response, next: NextFunction) => {
     try {
         let { email, password, name } = req.body
         
-        // ✅ ReDoS защита: ограничение длины всех полей
         if (email && typeof email === 'string') {
             email = email.slice(0, 100);
         }
@@ -84,12 +81,10 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
             name = name.slice(0, 100);
         }
         
-        // ✅ Валидация email
         if (!safeEmailValidate(email)) {
             return next(new BadRequestError('Невалидный формат email'));
         }
         
-        // ✅ Валидация пароля (минимальная длина)
         if (!password || password.length < 6) {
             return next(new BadRequestError('Пароль должен быть не менее 6 символов'));
         }
@@ -108,11 +103,14 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
             REFRESH_TOKEN.cookie.options
         )
         
+        // ✅ Возвращаем csrfToken для тестов
+        const csrfToken = (req as any).csrfToken ? (req as any).csrfToken() : null;
+        
         return res.status(constants.HTTP_STATUS_CREATED).json({
             success: true,
             user: newUser,
             accessToken,
-            csrfToken: req.csrfToken?.() || null,
+            csrfToken: csrfToken,
         })
     } catch (error) {
         if (error instanceof MongooseError.ValidationError) {
@@ -127,7 +125,6 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
     }
 }
 
-// GET /auth/user
 const getCurrentUser = async (
     _req: Request,
     res: Response,
@@ -179,7 +176,6 @@ const deleteRefreshTokenInUser = async (
     return user
 }
 
-// GET /auth/logout
 const logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
         await deleteRefreshTokenInUser(req, res, next)
@@ -196,7 +192,6 @@ const logout = async (req: Request, res: Response, next: NextFunction) => {
     }
 }
 
-// GET /auth/token
 const refreshAccessToken = async (
     req: Request,
     res: Response,
@@ -253,13 +248,11 @@ const updateCurrentUser = async (
 ) => {
     const userId = res.locals.user._id
     try {
-        // ✅ XSS защита + ограничение длины
         const sanitizedBody: any = { ...req.body };
         if (sanitizedBody.name) {
             sanitizedBody.name = sanitizeHtml(sanitizedBody.name).slice(0, 100);
         }
         if (sanitizedBody.email) {
-            // ✅ ReDoS защита: валидация email
             if (!safeEmailValidate(sanitizedBody.email)) {
                 return next(new BadRequestError('Невалидный формат email'));
             }

@@ -17,7 +17,6 @@ import routes from './routes'
 const { PORT = 3000 } = process.env
 const app = express()
 
-// Настройка rate limiter
 const limiter = rateLimit({
     windowMs: 60 * 1000,
     max: 50,
@@ -33,7 +32,6 @@ const limiter = rateLimit({
     }
 })
 
-// Применяем rate limiter (кроме CSRF токена)
 app.use((req, res, next) => {
     if (req.path === '/auth/csrf-token' || req.path === '/api/csrf-token') {
         return next();
@@ -92,10 +90,12 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
     return csrfProtection(_req, res, next)
 })
 
+// ✅ Эндпоинт для получения CSRF-токена (для фронтенда)
 app.get('/api/csrf-token', csrfProtection, (req, res) => {
     res.json({ csrfToken: req.csrfToken() })
 })
 
+// ✅ Эндпоинт для тестов (должен быть ДО serveStatic)
 app.get('/auth/csrf-token', csrfProtection, (req, res) => {
     res.json({ csrfToken: req.csrfToken() })
 })
@@ -130,7 +130,6 @@ app.use(routes)
 app.use(errors())
 app.use(errorHandler)
 
-// ✅ Упрощённые обработчики сигналов (без gracefulShutdown)
 process.on('SIGTERM', () => {
     console.log('SIGTERM received');
     mongoose.connection.close();
