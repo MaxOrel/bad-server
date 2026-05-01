@@ -84,8 +84,13 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
     return csrfProtection(_req, res, next)
 })
 
-// Эндпоинт для получения CSRF-токена
+// Эндпоинт для получения CSRF-токена (для фронтенда)
 app.get('/api/csrf-token', csrfProtection, (req, res) => {
+    res.json({ csrfToken: req.csrfToken() })
+})
+
+// ✅ Эндпоинт для тестов (ожидают /auth/csrf-token)
+app.get('/auth/csrf-token', csrfProtection, (req, res) => {
     res.json({ csrfToken: req.csrfToken() })
 })
 
@@ -123,9 +128,10 @@ app.use(errorHandler)
 const bootstrap = async () => {
     try {
         await mongoose.connect(DB_ADDRESS)
-        await app.listen(PORT, () => console.log('ok'))
+        app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
     } catch (error) {
         console.error(error)
+        process.exit(1)
     }
 }
 
