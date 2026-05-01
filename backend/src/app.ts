@@ -17,21 +17,14 @@ import routes from './routes'
 const { PORT = 3000 } = process.env
 const app = express()
 
+// Настройка rate limiter (максимально простая, без кастомных настроек)
 const limiter = rateLimit({
     windowMs: 60 * 1000,
     max: 50,
-    message: {
-        success: false,
-        message: 'Слишком много запросов. Попробуйте позже.'
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    skipSuccessfulRequests: false,
-    keyGenerator: (req) => {
-        return req.ip || req.socket.remoteAddress || 'unknown';
-    }
+    message: { success: false, message: 'Слишком много запросов. Попробуйте позже.' },
 })
 
+// Применяем rate limiter глобально (кроме CSRF токена)
 app.use((req, res, next) => {
     if (req.path === '/auth/csrf-token' || req.path === '/api/csrf-token') {
         return next();
@@ -75,6 +68,7 @@ app.use(cors({
     credentials: true,
 }))
 
+// CSRF защита
 const csrfProtection = csrf({
     cookie: {
         httpOnly: true,
@@ -83,6 +77,7 @@ const csrfProtection = csrf({
     }
 })
 
+// Глобально применяем CSRF защиту
 app.use((_req: Request, res: Response, next: NextFunction) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(_req.method)) {
         return next()
@@ -90,18 +85,19 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
     return csrfProtection(_req, res, next)
 })
 
-// ✅ Эндпоинт для получения CSRF-токена (для фронтенда)
+// Эндпоинт для получения CSRF-токена
 app.get('/api/csrf-token', csrfProtection, (req, res) => {
     res.json({ csrfToken: req.csrfToken() })
 })
 
-// ✅ Эндпоинт для тестов (должен быть ДО serveStatic)
+// Эндпоинт для тестов
 app.get('/auth/csrf-token', csrfProtection, (req, res) => {
     res.json({ csrfToken: req.csrfToken() })
 })
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 
+// Защита от Path Traversal
 app.use((req: Request, res: Response, next: NextFunction) => {
     const { url } = req
     const dangerousPatterns = [
@@ -126,26 +122,43 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     next()
 })
 
+// Обработчик ошибок CSRF
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+        console.error('CSRF token validation failed:', err.message)
+        return res.status(403).json({ success: false, message: 'Invalid CSRF token' })
+    }
+    next(err)
+})
+
 app.use(routes)
 app.use(errors())
 app.use(errorHandler)
 
+// Graceful shutdown (упрощённый, без callback для close)
 process.on('SIGTERM', () => {
-    console.log('SIGTERM received');
+    console.log('SIGTERM received, closing server...');
     mongoose.connection.close();
+    process.exit(0);
 });
 
 process.on('SIGINT', () => {
-    console.log('SIGINT received');
+    console.log('SIGINT received, closing server...');
     mongoose.connection.close();
+    process.exit(0);
 });
 
 const bootstrap = async () => {
     try {
         await mongoose.connect(DB_ADDRESS)
-        app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+        console.log('✅ MongoDB connected successfully')
+        
+        app.listen(PORT, () => {
+            console.log(`✅ Server running on port ${PORT}`)
+            console.log(`✅ CSRF endpoint: http://localhost:${PORT}/auth/csrf-token`)
+        })
     } catch (error) {
-        console.error(error)
+        console.error('❌ Bootstrap error:', error)
         process.exit(1)
     }
 }
