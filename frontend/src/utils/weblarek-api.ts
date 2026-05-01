@@ -25,14 +25,10 @@ export const enum RequestStatus {
     Failed = 'failed',
 }
 
-export type ApiListResponse<Type> = {
-    total: number
-    items: Type[]
-}
-
 class Api {
     private readonly baseUrl: string
     protected options: RequestInit
+    private csrfToken: string | null = null // ✅ Тип: string | null
 
     constructor(baseUrl: string, options: RequestInit = {}) {
         this.baseUrl = baseUrl
@@ -40,6 +36,24 @@ class Api {
             headers: {
                 ...((options.headers as object) ?? {}),
             },
+        }
+    }
+
+    // ✅ ИСПРАВЛЕНО: возвращаем string, а не string | null
+    private async getCsrfToken(): Promise<string> {
+        if (this.csrfToken) return this.csrfToken;
+        
+        try {
+            const response = await fetch(`${this.baseUrl}/api/csrf-token`, {
+                method: 'GET',
+                credentials: 'include',
+            });
+            const data = await response.json();
+            this.csrfToken = data.csrfToken || null;
+            return this.csrfToken || ''; // ✅ Возвращаем пустую строку, если null
+        } catch (error) {
+            console.error('Failed to get CSRF token:', error);
+            return ''; // ✅ Возвращаем пустую строку при ошибке
         }
     }
 
@@ -55,9 +69,26 @@ class Api {
 
     protected async request<T>(endpoint: string, options: RequestInit) {
         try {
+            // ✅ ИСПРАВЛЕНО: типизация headers
+            const csrfToken = await this.getCsrfToken();
+            
+            // ✅ Создаём правильный тип для headers
+            const headers: Record<string, string> = {
+                ...(this.options.headers as Record<string, string> || {}),
+                ...(options.headers as Record<string, string> || {}),
+            };
+            
+            // ✅ Добавляем CSRF токен для мутирующих методов
+            const method = options.method || 'GET';
+            if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && csrfToken) {
+                headers['CSRF-Token'] = csrfToken;
+            }
+            
             const res = await fetch(`${this.baseUrl}${endpoint}`, {
                 ...this.options,
                 ...options,
+                headers,
+                credentials: 'include', // Важно для передачи cookie
             })
             return await this.handleResponse<T>(res)
         } catch (error) {
@@ -84,12 +115,16 @@ class Api {
                 return Promise.reject(refreshData)
             }
             setCookie('accessToken', refreshData.accessToken)
+            
+            // ✅ Обновляем заголовки с новым токеном
+            const updatedHeaders = {
+                ...options.headers,
+                Authorization: `Bearer ${getCookie('accessToken')}`,
+            };
+            
             return await this.request<T>(endpoint, {
                 ...options,
-                headers: {
-                    ...options.headers,
-                    Authorization: `Bearer ${getCookie('accessToken')}`,
-                },
+                headers: updatedHeaders,
             })
         }
     }

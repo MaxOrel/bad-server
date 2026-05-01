@@ -17,6 +17,9 @@ export function setCookie(
 ) {
     props = {
         path: '/',
+        // ✅ ДОБАВЛЕНО: усиление безопасности cookie
+        secure: true,        // Отправлять только по HTTPS
+        sameSite: 'strict',  // Защита от CSRF
         ...props,
     }
 

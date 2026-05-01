@@ -1,3 +1,6 @@
+import { safeFormatNumber } from './sanitize';
+
 export function addSpacesToNumber(num: number) {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+    // ✅ ИСПРАВЛЕНО: используем безопасное форматирование
+    return safeFormatNumber(num);
 }

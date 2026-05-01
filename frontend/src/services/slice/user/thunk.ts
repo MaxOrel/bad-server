@@ -1,51 +1,51 @@
-import {
-    ServerResponse,
-    UserLoginBodyDto,
-    UserRegisterBodyDto,
-    UserResponse,
-    UserResponseToken,
-} from '@types'
-import { setCookie } from '../../../utils/cookie'
 import { createAsyncThunk } from '../../hooks'
+import { UserLoginBodyDto, UserRegisterBodyDto, UserResponseToken } from '../../../utils/types'
 
-export const checkUserAuth = createAsyncThunk<UserResponse, void>(
-    `user/checkUserAuth`,
+// ✅ Обновляем интерфейс ответа с CSRF токеном
+interface UserResponseWithCSRF extends UserResponseToken {
+    csrfToken?: string;
+}
+
+export const loginUser = createAsyncThunk(
+    'user/login',
+    async (data: UserLoginBodyDto, { extra: api }) => {
+        const response = await api.loginUser(data) as UserResponseWithCSRF;
+        // Сохраняем CSRF токен если нужно
+        if (response.csrfToken) {
+            localStorage.setItem('csrfToken', response.csrfToken);
+        }
+        return response;
+    }
+)
+
+export const registerUser = createAsyncThunk(
+    'user/register',
+    async (data: UserRegisterBodyDto, { extra: api }) => {
+        const response = await api.registerUser(data) as UserResponseWithCSRF;
+        if (response.csrfToken) {
+            localStorage.setItem('csrfToken', response.csrfToken);
+        }
+        return response;
+    }
+)
+
+export const checkUserAuth = createAsyncThunk(
+    'user/checkAuth',
     async (_, { extra: api }) => {
         return await api.getUser()
     }
 )
 
-export const checkUserRoles = createAsyncThunk<string[], void>(
-    `user/checkUserRoles`,
+export const checkUserRoles = createAsyncThunk(
+    'user/checkRoles',
     async (_, { extra: api }) => {
         return await api.getUserRoles()
     }
 )
 
-export const registerUser = createAsyncThunk<
-    UserResponseToken,
-    UserRegisterBodyDto
->(`user/registerUser`, async (dataUser, { extra: api }) => {
-    const data = await api.registerUser(dataUser)
-    setCookie('accessToken', data.accessToken)
-    return data
-})
-
-export const loginUser = createAsyncThunk<UserResponseToken, UserLoginBodyDto>(
-    `user/loginUser`,
-    async (dataUser, { extra: api }) => {
-        const data = await api.loginUser(dataUser)
-        setCookie('accessToken', data.accessToken)
-        return data
-    }
-)
-
-export const logoutUser = createAsyncThunk<ServerResponse<unknown>, void>(
-    `user/logoutUser`,
+export const logoutUser = createAsyncThunk(
+    'user/logout',
     async (_, { extra: api }) => {
-        const data = await api.logoutUser()
-        setCookie('accessToken', '', { expires: new Date(0) })
-        setCookie('refreshToken', '', { expires: new Date(0) })
-        return data
+        return await api.logoutUser()
     }
 )
