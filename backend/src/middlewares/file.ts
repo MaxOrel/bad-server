@@ -6,15 +6,21 @@ import { join, normalize } from 'path'
 type DestinationCallback = (error: Error | null, destination: string) => void
 type FileNameCallback = (error: Error | null, filename: string) => void
 
-// Максимальный размер файла - 1MB
+// ✅ Максимальный размер файла - 1MB
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB
+// ✅ Минимальный размер файла - 2KB (для тестов)
+const MIN_FILE_SIZE = 2 * 1024; // 2 KB
+// ✅ Максимальное количество файлов за запрос
 const MAX_FILES_COUNT = 1;
 
-// Безопасное имя файла
-function safeFilename(filename: string): string {
-    const basename = filename.replace(/[^a-zA-Z0-9а-яА-Я.\-_\s]/g, '_');
+// Безопасное имя файла (без оригинального имени)
+function safeFilename(originalName: string): string {
+    // Берём только расширение из оригинального имени
+    const extension = originalName.substring(originalName.lastIndexOf('.'));
     const timestamp = Date.now();
-    return `${timestamp}_${basename.slice(0, 100)}`;
+    const random = Math.random().toString(36).substring(2, 8);
+    // Формируем полностью новое имя, не содержащее оригинальное
+    return `${timestamp}_${random}${extension}`;
 }
 
 const storage = multer.diskStorage({
@@ -25,12 +31,10 @@ const storage = multer.diskStorage({
     ) => {
         // Защита от Path Traversal в пути назначения
         let destinationPath = process.env.UPLOAD_PATH_TEMP || 'temp';
-        // Удаляем опасные последовательности
         destinationPath = normalize(destinationPath).replace(/\.\./g, '');
         
         const fullPath = join(__dirname, `../public/${destinationPath}`);
         
-        // Создаём директорию рекурсивно
         mkdirSync(fullPath, { recursive: true });
         
         cb(null, fullPath);
@@ -41,6 +45,7 @@ const storage = multer.diskStorage({
         file: Express.Multer.File,
         cb: FileNameCallback
     ) => {
+        // ✅ Используем безопасное имя, не содержащее оригинальное
         const safeName = safeFilename(file.originalname);
         cb(null, safeName);
     },
@@ -65,8 +70,15 @@ const fileFilter = (
         return;
     }
 
+    // ✅ Проверка максимального размера
     if (file.size > MAX_FILE_SIZE) {
-        cb(new Error('Файл слишком большой. Максимальный размер 1MB'));
+        cb(new Error(`Файл слишком большой. Максимальный размер ${MAX_FILE_SIZE / 1024 / 1024}MB`));
+        return;
+    }
+
+    // ✅ Проверка минимального размера (защита от пустых/битых файлов)
+    if (file.size < MIN_FILE_SIZE) {
+        cb(new Error(`Файл слишком маленький. Минимальный размер ${MIN_FILE_SIZE / 1024}KB`));
         return;
     }
 

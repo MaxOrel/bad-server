@@ -19,8 +19,8 @@ const app = express()
 
 // Защита от DDoS и переполнения буфера
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+    windowMs: 60 * 1000,
+    max: 10,
     message: 'Слишком много запросов, попробуйте позже',
     standardHeaders: true,
     legacyHeaders: false,

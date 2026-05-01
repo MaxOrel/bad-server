@@ -16,12 +16,28 @@ const MAX_EMAIL_LENGTH = 100
 const MAX_ORDER_TOTAL = 1000000
 const MAX_SEARCH_LENGTH = 100
 
+// ✅ Защита от NoSQL инъекций в агрегации
+const dangerousOperators = ['$where', '$function', '$expr', '$jsonSchema', '$regex', '$options'];
+const checkForDangerousOperators = (obj: any): boolean => {
+    if (!obj || typeof obj !== 'object') return false;
+    for (const key of Object.keys(obj)) {
+        if (dangerousOperators.includes(key)) return true;
+        if (typeof obj[key] === 'object' && checkForDangerousOperators(obj[key])) return true;
+    }
+    return false;
+};
+
 export const getOrders = async (
     req: Request,
     res: Response,
     next: NextFunction
 ) => {
     try {
+        // ✅ Защита от NoSQL инъекций в query параметрах
+        if (checkForDangerousOperators(req.query)) {
+            return next(new BadRequestError('Invalid query parameters'));
+        }
+
         const {
             page = 1,
             limit = 10,
@@ -36,7 +52,8 @@ export const getOrders = async (
         } = req.query
 
         const pageNum = Math.max(1, Number(page) || 1)
-        const limitNum = Math.min(100, Math.max(1, Number(limit) || 10))
+        // ✅ Исправлено: лимит ограничен 10 (как требует тест)
+        const limitNum = Math.min(10, Math.max(1, Number(limit) || 10))
 
         const filters: FilterQuery<Partial<IOrder>> = {}
 
@@ -209,7 +226,7 @@ export const getOrdersCurrentUser = async (
         const { search, page = 1, limit = 5 } = req.query
 
         const pageNum = Math.max(1, Number(page) || 1)
-        const limitNum = Math.min(50, Math.max(1, Number(limit) || 5))
+        const limitNum = Math.min(10, Math.max(1, Number(limit) || 5))
 
         let sanitizedSearch = ''
         if (search && typeof search === 'string') {

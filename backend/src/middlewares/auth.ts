@@ -45,9 +45,10 @@ export function roleGuardMiddleware(...roles: Role[]) {
             return next(new UnauthorizedError('Необходима авторизация'))
         }
 
-        const hasAccess = roles.some((role) =>
-            res.locals.user.roles.includes(role)
-        )
+        // ✅ Проверяем, что у пользователя есть хотя бы одна из требуемых ролей
+        const hasAccess = res.locals.user.roles?.some((role: Role) => 
+            roles.includes(role)
+        ) ?? false
 
         if (!hasAccess) {
             return next(new ForbiddenError('Доступ запрещен'))
