@@ -11,6 +11,7 @@ import { DB_ADDRESS } from './config'
 import errorHandler from './middlewares/error-handler'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
+import crypto from 'crypto'
 
 const { PORT = 3000 } = process.env
 const app = express()
@@ -64,17 +65,51 @@ app.use(cors({
     credentials: true,
 }))
 
-// Временное упрощение для CSRF
+// ============================================================
+// ✅ УПРОЩЁННАЯ CSRF ЗАЩИТА (без csurf)
+// ============================================================
+
+// Генерация CSRF токена
+function generateCsrfToken(): string {
+    return crypto.randomBytes(32).toString('hex')
+}
+
+// Эндпоинт для получения CSRF токена (для фронтенда)
+app.get('/api/csrf-token', (req, res) => {
+    const token = generateCsrfToken()
+    res.cookie('csrfToken', token, { httpOnly: true, sameSite: 'lax' })
+    res.json({ csrfToken: token })
+})
+
+// Эндпоинт для тестов
+app.get('/auth/csrf-token', (req, res) => {
+    const token = generateCsrfToken()
+    res.cookie('csrfToken', token, { httpOnly: true, sameSite: 'lax' })
+    res.json({ csrfToken: token })
+})
+
+// ✅ MIDDLEWARE ДЛЯ ПРОВЕРКИ CSRF (для мутирующих методов)
 app.use((req, res, next) => {
-    // Для тестов просто добавляем csrfToken в ответ
-    if (req.path === '/auth/csrf-token' || req.path === '/api/csrf-token') {
-        return res.json({ csrfToken: 'test-csrf-token-for-ci' })
+    // Пропускаем безопасные методы
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        return next()
     }
+    
+    // Получаем токен из заголовка
+    const token = req.headers['csrf-token'] || req.headers['x-csrf-token']
+    const cookieToken = req.cookies?.csrfToken
+    
+    if (!token || !cookieToken || token !== cookieToken) {
+        console.warn(`CSRF validation failed for ${req.method} ${req.path}`)
+        return res.status(403).json({ success: false, message: 'Invalid CSRF token' })
+    }
+    
     next()
 })
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 
+// Защита от Path Traversal
 app.use((req, res, next) => {
     const { url } = req
     const dangerousPatterns = [
