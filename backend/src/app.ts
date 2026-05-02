@@ -18,20 +18,28 @@ const app = express()
 
 // Определяем, запущены ли тесты
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.CI === 'true'
+// Определяем, запущен ли DDoS тест (который реально проверяет rate limiter)
+const isDDoSTest = process.env.TEST_DDOS === 'true'
 
-// Настройка rate limiter
+// Настройка rate limiter - только для DDoS теста и production
 const limiter = rateLimit({
     windowMs: 60 * 1000,
-    max: isTestEnv ? 1000 : 50,
+    max: isDDoSTest ? 50 : (isTestEnv ? 10000 : 50),
     message: { success: false, message: 'Слишком много запросов. Попробуйте позже.' },
 })
 
-// Применяем rate limiter
+// Применяем rate limiter ТОЛЬКО для production или DDoS теста
 app.use((req, res, next) => {
+    // Всегда пропускаем CSRF эндпоинты
     if (req.path === '/auth/csrf-token' || req.path === '/api/csrf-token') {
         return next()
     }
-    return limiter(req, res, next)
+    // Применяем rate limiter только если это production или DDoS тест
+    if (!isTestEnv || isDDoSTest) {
+        return limiter(req, res, next)
+    }
+    // Для обычных тестов пропускаем rate limiter полностью
+    return next()
 })
 
 app.use(json({ limit: '1mb' }))
@@ -149,7 +157,6 @@ process.on('SIGINT', () => {
 
 const bootstrap = async () => {
     try {
-        // ✅ Улучшенные настройки подключения к MongoDB для предотвращения таймаутов
         await mongoose.connect(DB_ADDRESS, {
             maxPoolSize: 10,
             serverSelectionTimeoutMS: 5000,
@@ -163,7 +170,7 @@ const bootstrap = async () => {
             console.log(`✅ Server running on port ${PORT}`)
             console.log(`✅ CSRF endpoint: http://localhost:${PORT}/auth/csrf-token`)
             console.log(`✅ Environment: ${isTestEnv ? 'TEST' : 'PRODUCTION'}`)
-            console.log(`✅ Rate limit: ${isTestEnv ? '1000 req/min' : '50 req/min'}`)
+            console.log(`✅ Rate limit: ${isDDoSTest ? '50 req/min (DDoS test)' : (isTestEnv ? 'DISABLED for tests' : '50 req/min')}`)
         })
     } catch (error) {
         console.error('❌ Bootstrap error:', error)
