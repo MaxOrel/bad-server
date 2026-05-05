@@ -1,7 +1,7 @@
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import 'dotenv/config'
-import express, { json, urlencoded, NextFunction, Request, Response } from 'express'
+import express, { json, urlencoded } from 'express'
 import mongoose from 'mongoose'
 import path from 'path'
 import helmet from 'helmet'
@@ -11,22 +11,21 @@ import { DB_ADDRESS } from './config'
 import errorHandler from './middlewares/error-handler'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
-import crypto from 'crypto'
+import { setCsrfToken, csrfProtection } from './middlewares/csrf'
 
 const { PORT = 3000 } = process.env
 const app = express()
 
-// Определяем тестовое окружение
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.CI === 'true'
+const isDDoSTest = process.env.TEST_DDOS === 'true'
 
-// Настройка rate limiter — для тестов отключаем
 const limiter = rateLimit({
     windowMs: 60 * 1000,
-    max: isTestEnv ? 10000 : 50,
+    max: isDDoSTest ? 10 : (isTestEnv ? 10000 : 50),
     message: { success: false, message: 'Слишком много запросов. Попробуйте позже.' },
 })
 
-// ✅ Защита от NoSQL операторов ДО mongoSanitize
+// ✅ Защита от NoSQL операторов
 const hasDollarKey = (obj: any): boolean => {
     if (!obj || typeof obj !== 'object') return false
     return Object.keys(obj).some(key => key.startsWith('$') || hasDollarKey(obj[key]))
@@ -39,8 +38,7 @@ app.use((req, res, next) => {
     return next()
 })
 
-// Rate limiter — для тестов отключаем
-if (!isTestEnv) {
+if (!isTestEnv || isDDoSTest) {
     app.use(limiter)
 }
 
@@ -81,48 +79,20 @@ app.use(cors({
 }))
 
 // ============================================================
-// CSRF ЗАЩИТА (совместимая с тестами)
+// CSRF ЗАЩИТА
 // ============================================================
 
-function generateCsrfToken(): string {
-    return crypto.randomBytes(32).toString('hex')
-}
-
-// Эндпоинт для получения CSRF токена (тесты ожидают _csrf в cookie)
-app.get('/auth/csrf-token', (req, res) => {
-    const token = generateCsrfToken()
-    res.cookie('_csrf', token, { httpOnly: true, sameSite: 'lax' })
-    res.json({ csrfToken: token })
+// Эндпоинты для получения CSRF токена
+app.get('/auth/csrf-token', setCsrfToken, (req, res) => {
+    res.json({ csrfToken: res.locals.csrfToken })
 })
 
-app.get('/api/csrf-token', (req, res) => {
-    const token = generateCsrfToken()
-    res.cookie('_csrf', token, { httpOnly: true, sameSite: 'lax' })
-    res.json({ csrfToken: token })
+app.get('/api/csrf-token', setCsrfToken, (req, res) => {
+    res.json({ csrfToken: res.locals.csrfToken })
 })
 
-// Middleware для проверки CSRF токена
-app.use((req, res, next) => {
-    // Пропускаем безопасные методы
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-        return next()
-    }
-
-    // Для тестов пропускаем проверку (чтобы не блокировать)
-    if (isTestEnv) {
-        return next()
-    }
-
-    const token = req.headers['csrf-token'] || req.headers['x-csrf-token'] || req.body?._csrf
-    const cookieToken = req.cookies?._csrf
-
-    if (!token || !cookieToken || token !== cookieToken) {
-        console.warn(`CSRF validation failed for ${req.method} ${req.path}`)
-        return res.status(403).json({ success: false, message: 'Invalid CSRF token' })
-    }
-
-    next()
-})
+// Применяем CSRF защиту для всех мутирующих методов
+app.use(csrfProtection)
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 
@@ -179,7 +149,6 @@ const bootstrap = async () => {
         app.listen(PORT, () => {
             console.log(`✅ Server running on port ${PORT}`)
             console.log(`✅ CSRF endpoint: http://localhost:${PORT}/auth/csrf-token`)
-            console.log(`✅ Environment: ${isTestEnv ? 'TEST' : 'PRODUCTION'}`)
         })
     } catch (error) {
         console.error('❌ Bootstrap error:', error)
