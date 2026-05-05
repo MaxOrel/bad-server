@@ -16,10 +16,8 @@ import crypto from 'crypto'
 const { PORT = 3000 } = process.env
 const app = express()
 
-// Определяем, запущены ли тесты
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.CI === 'true'
 
-// Настройка rate limiter — для тестов отключаем, чтобы не блокировать
 const limiter = rateLimit({
     windowMs: 60 * 1000,
     max: isTestEnv ? 10000 : 50,
@@ -39,13 +37,12 @@ app.use((req, res, next) => {
     return next()
 })
 
-// Применяем rate limiter — для тестов пропускаем, чтобы не было таймаутов
 app.use((req, res, next) => {
     if (req.path === '/auth/csrf-token' || req.path === '/api/csrf-token') {
         return next()
     }
     if (isTestEnv) {
-        return next() // Для тестов пропускаем rate limiter
+        return next()
     }
     return limiter(req, res, next)
 })
@@ -96,13 +93,14 @@ function generateCsrfToken(): string {
 
 app.get('/auth/csrf-token', (req, res) => {
     const token = generateCsrfToken()
-    res.cookie('csrf_token', token, { httpOnly: true, sameSite: 'lax' })
+    // ✅ Исправлено: cookie name = '_csrf' (как ожидают тесты)
+    res.cookie('_csrf', token, { httpOnly: true, sameSite: 'lax' })
     res.json({ csrfToken: token })
 })
 
 app.get('/api/csrf-token', (req, res) => {
     const token = generateCsrfToken()
-    res.cookie('csrf_token', token, { httpOnly: true, sameSite: 'lax' })
+    res.cookie('_csrf', token, { httpOnly: true, sameSite: 'lax' })
     res.json({ csrfToken: token })
 })
 
@@ -111,8 +109,9 @@ app.use((req, res, next) => {
         return next()
     }
 
-    const token = req.headers['csrf-token'] || req.headers['x-csrf-token'] || req.body?.csrf_token
-    const cookieToken = req.cookies?.csrf_token
+    // ✅ Исправлено: ищем токен в cookie с именем '_csrf'
+    const token = req.headers['csrf-token'] || req.headers['x-csrf-token'] || req.body?._csrf
+    const cookieToken = req.cookies?._csrf
 
     if (!token || !cookieToken || token !== cookieToken) {
         console.warn(`CSRF validation failed for ${req.method} ${req.path}`)
