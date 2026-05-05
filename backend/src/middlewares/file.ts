@@ -1,7 +1,7 @@
 import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import { mkdirSync } from 'fs'
-import { join, normalize } from 'path'
+import { extname, join, normalize } from 'path'
 
 type DestinationCallback = (error: Error | null, destination: string) => void
 type FileNameCallback = (error: Error | null, filename: string) => void
@@ -15,9 +15,8 @@ const MAX_FILES_COUNT = 1;
 
 // Безопасное имя файла (без оригинального имени)
 function safeFilename(originalName: string): string {
-    // Извлекаем только расширение (если есть)
-    const lastDotIndex = originalName.lastIndexOf('.');
-    const extension = lastDotIndex > 0 ? originalName.substring(lastDotIndex) : '';
+    // path.extname correctly handles path-traversal names (e.g. '../secret' → '')
+    const extension = extname(originalName).toLowerCase();
     
     // Генерируем полностью случайное имя
     const timestamp = Date.now();
