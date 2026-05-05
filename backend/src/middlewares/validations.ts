@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express'
 import Joi from 'joi'
 import { Types } from 'mongoose'
 
-export const phoneRegExp = /^(\+\d+)?(?:\s|-?|\(?\d+\)?)+$/
+export const phoneRegExp = /^(\+\d{1,4})?([\d\s()-]+)$/
 
 export enum PaymentType {
     Card = 'card',
