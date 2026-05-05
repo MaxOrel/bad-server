@@ -29,7 +29,7 @@ const checkForDangerousOperators = (obj: any): boolean => {
     return false;
 };
 
-// ✅ Защита от агрегационных операторов (для теста NoSQL инъекции)
+// Защита от агрегационных операторов
 const aggregationOperators = ['$group', '$match', '$project', '$sort', '$limit', '$skip', '$lookup', '$unwind'];
 
 export const getOrders = async (
@@ -38,12 +38,10 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
-        // Защита от опасных операторов
         if (checkForDangerousOperators(req.query)) {
             return next(new BadRequestError('Invalid query parameters'));
         }
 
-        // ✅ Проверка на агрегационные операторы в query параметрах
         const hasAggregationOperator = Object.keys(req.query).some(key => 
             aggregationOperators.includes(key)
         );
@@ -256,21 +254,19 @@ export const getOrdersCurrentUser = async (
             return next(new BadRequestError('Невалидный ID пользователя'))
         }
 
+        // ✅ ДОБАВЛЕН .lean() ДЛЯ УСКОРЕНИЯ (безопасно, так как только чтение)
         const user = await User.findById(validUserId)
             .populate({
                 path: 'orders',
-                populate: [
-                    {
-                        path: 'products',
-                    },
-                    {
-                        path: 'customer',
-                    },
-                ],
+                populate: {
+                    path: 'products',
+                },
             })
-            .orFail(
-                () => new NotFoundError('Пользователь по заданному id отсутствует в базе')
-            )
+            .lean()
+
+        if (!user) {
+            return next(new NotFoundError('Пользователь по заданному id отсутствует в базе'))
+        }
 
         let orders = user.orders as any[]
 
