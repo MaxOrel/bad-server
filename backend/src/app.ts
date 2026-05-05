@@ -1,31 +1,29 @@
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import 'dotenv/config'
-import express, { json, urlencoded } from 'express'
+import express, { json, urlencoded, NextFunction, Request, Response } from 'express'
 import mongoose from 'mongoose'
 import path from 'path'
 import helmet from 'helmet'
 import mongoSanitize from 'express-mongo-sanitize'
 import rateLimit from 'express-rate-limit'
+import csrf from 'csurf'
 import { DB_ADDRESS } from './config'
 import errorHandler from './middlewares/error-handler'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
-import { setCsrfToken, csrfProtection } from './middlewares/csrf'
 
 const { PORT = 3000 } = process.env
 const app = express()
 
-const isTestEnv = process.env.NODE_ENV === 'test' || process.env.CI === 'true'
-const isDDoSTest = process.env.TEST_DDOS === 'true'
-
+// Настройка rate limiter
 const limiter = rateLimit({
     windowMs: 60 * 1000,
-    max: isDDoSTest ? 10 : (isTestEnv ? 10000 : 50),
+    max: 50,
     message: { success: false, message: 'Слишком много запросов. Попробуйте позже.' },
 })
 
-// ✅ Защита от NoSQL операторов
+// Защита от NoSQL операторов
 const hasDollarKey = (obj: any): boolean => {
     if (!obj || typeof obj !== 'object') return false
     return Object.keys(obj).some(key => key.startsWith('$') || hasDollarKey(obj[key]))
@@ -38,9 +36,7 @@ app.use((req, res, next) => {
     return next()
 })
 
-if (!isTestEnv || isDDoSTest) {
-    app.use(limiter)
-}
+app.use(limiter)
 
 app.use(json({ limit: '1mb' }))
 app.use(urlencoded({ extended: true, limit: '1mb' }))
@@ -79,23 +75,46 @@ app.use(cors({
 }))
 
 // ============================================================
-// CSRF ЗАЩИТА
+// CSRF ЗАЩИТА (через пакет csurf с обходом типов)
 // ============================================================
 
+const csrfProtection = csrf({
+    cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+    }
+}) as any  // ✅ обход типов для совместимости
+
 // Эндпоинты для получения CSRF токена
-app.get('/auth/csrf-token', setCsrfToken, (req, res) => {
-    res.json({ csrfToken: res.locals.csrfToken })
+app.get('/auth/csrf-token', csrfProtection, (req, res) => {
+    res.json({ csrfToken: (req as any).csrfToken() })
 })
 
-app.get('/api/csrf-token', setCsrfToken, (req, res) => {
-    res.json({ csrfToken: res.locals.csrfToken })
+app.get('/api/csrf-token', csrfProtection, (req, res) => {
+    res.json({ csrfToken: (req as any).csrfToken() })
 })
 
-// Применяем CSRF защиту для всех мутирующих методов
-app.use(csrfProtection)
+// Глобальная CSRF защита для мутирующих методов
+app.use((req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        return next()
+    }
+    return csrfProtection(req, res, next)
+})
+
+// Обработчик ошибок CSRF
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+        console.error('CSRF token validation failed:', err.message)
+        return res.status(403).json({ success: false, message: 'Invalid CSRF token' })
+    }
+    next(err)
+})
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 
+// Защита от Path Traversal
 app.use((req, res, next) => {
     const { url } = req
     const dangerousPatterns = [
@@ -149,6 +168,7 @@ const bootstrap = async () => {
         app.listen(PORT, () => {
             console.log(`✅ Server running on port ${PORT}`)
             console.log(`✅ CSRF endpoint: http://localhost:${PORT}/auth/csrf-token`)
+            console.log(`✅ Rate limit: 50 req/min`)
         })
     } catch (error) {
         console.error('❌ Bootstrap error:', error)
