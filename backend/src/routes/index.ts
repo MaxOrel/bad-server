@@ -11,7 +11,7 @@ import csrfRoutes from './csrf';
 
 const router = Router()
 
-router.use('/csrf', csrfRoutes);
+router.use('/auth/csrf-token', csrfRoutes);
 router.use('/auth', authRouter)
 router.use('/product', productRouter)
 router.use('/order', auth, orderRouter)
