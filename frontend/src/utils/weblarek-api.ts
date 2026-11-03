@@ -33,6 +33,7 @@ export type ApiListResponse<Type> = {
 class Api {
     private readonly baseUrl: string
     protected options: RequestInit
+    private csrfToken: string | null = null
 
     constructor(baseUrl: string, options: RequestInit = {}) {
         this.baseUrl = baseUrl
@@ -41,6 +42,22 @@ class Api {
                 ...((options.headers as object) ?? {}),
             },
         }
+    }
+
+    protected async getCsrfToken() {
+        if (this.csrfToken) {
+            return this.csrfToken
+        }
+
+        const res = await fetch(`${this.baseUrl}/auth/csrf-token`, {
+            ...this.options,
+            credentials: 'include',
+        })
+
+        const data = await res.json()
+        this.csrfToken = data.csrfToken
+
+        return data.csrfToken
     }
 
     protected handleResponse<T>(response: Response): Promise<T> {
@@ -55,9 +72,24 @@ class Api {
 
     protected async request<T>(endpoint: string, options: RequestInit) {
         try {
+            const method = options.method ?? 'GET'
+            let requestOptions = options
+
+            if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+                const token = await this.getCsrfToken()
+                requestOptions = {
+                    ...options,
+                    headers: {
+                        ...options.headers,
+                        'X-CSRF-Token': token,
+                    },
+                    credentials: 'include',
+                }
+            }
+
             const res = await fetch(`${this.baseUrl}${endpoint}`, {
                 ...this.options,
-                ...options,
+                ...requestOptions,
             })
             return await this.handleResponse<T>(res)
         } catch (error) {

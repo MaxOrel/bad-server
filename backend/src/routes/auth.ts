@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import {
+    getCsrfToken,
     getCurrentUser,
     getCurrentUserRoles,
     login,
@@ -19,5 +20,6 @@ authRouter.post('/login', login)
 authRouter.get('/token', refreshAccessToken)
 authRouter.get('/logout', logout)
 authRouter.post('/register', register)
+authRouter.get('/csrf-token', getCsrfToken)
 
 export default authRouter

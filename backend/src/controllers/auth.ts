@@ -206,6 +206,18 @@ const updateCurrentUser = async (
     }
 }
 
+const getCsrfToken = (
+    _req: Request,
+    res: Response
+) => {
+    const token = crypto.randomUUID();
+    res.cookie('_csrf', token, {
+        httpOnly: true,
+        sameSite: 'strict',
+    })
+    return res.json({ csrfToken: token })
+}
+
 export {
     getCurrentUser,
     getCurrentUserRoles,
@@ -214,4 +226,5 @@ export {
     refreshAccessToken,
     register,
     updateCurrentUser,
+    getCsrfToken,
 }
