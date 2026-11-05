@@ -12,6 +12,9 @@
     "preview": "vite preview",
     "format": "prettier ./src --write"
   },
+  "overrides": {
+    "minimatch": "^11.0.1"
+  },
   "dependencies": {
     "@mona-health/react-input-mask": "^3.0.3",
     "@reduxjs/toolkit": "^2.2.5",
@@ -31,13 +34,13 @@
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@types/redux-persist": "^4.3.1",
-    "@typescript-eslint/eslint-plugin": "^7.2.0",
-    "@typescript-eslint/parser": "^7.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.37.0",
+    "@typescript-eslint/parser": "^8.37.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "eslint": "^8.57.0",
+    "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-import": "^2.29.1",
-    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.6",
     "prettier": "^3.3.3",
     "sass": "^1.77.2",
